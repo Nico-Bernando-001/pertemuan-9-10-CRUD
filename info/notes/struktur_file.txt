@@ -1,0 +1,28 @@
+pertemuan-9-10-CRUD/
+├── assets/
+│   ├── css/style.css             ← DIPERBARUI (style .success-box, .btn-edit, .btn-delete)
+│   └── js/script.js              ← DIPERBARUI (kirim ?id= saat edit)
+├── components/
+│   ├── header.php
+│   └── footer.php
+├── info/
+│   ├── database/
+│   │   ├── database.sql          ← DATABASE AWAL
+│   │   └── migration.sql         ← UPDATE DATABASE
+│   ├── example/
+│   │   ├── functions.png
+│   │   ├── index.png             ← screenshot kode index.php awal
+│   │   └── tambah_data.png       ← screenshot kode tambah.php awal
+│   └── notes/
+│       ├── prompt.txt            ← prompt Deepseek
+│       └── struktur_file.txt     ← kita ada di sini
+├── config.php
+├── functions.php                 ← DIPERBARUI (tambah ambilMahasiswaById, updateMahasiswa, hapusMahasiswa)
+├── index.php                     ← DIPERBARUI (kolom Aksi + notifikasi status)
+├── tambah.php
+├── edit.php                      ← BARU
+├── hapus.php                     ← BARU
+├── generate_nim.php              ← DIPERBARUI (support mode edit via ?id=)
+├── login.php
+├── dashboard.php
+└── logout.php

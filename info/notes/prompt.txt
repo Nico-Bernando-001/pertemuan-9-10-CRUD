@@ -1,0 +1,887 @@
+STRUKTUR KODE: 
+
+pertemuan-9/
+│
+├── assets/
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       └── script.js
+│
+├── components/
+│   ├── header.php
+│   └── footer.php
+│
+├── config.php
+├── functions.php
+├── index.php
+├── tambah.php
+├── login.php
+├── dashboard.php
+└── logout.php
+
+#
+#
+#
+
+KODE config.php: 
+
+<?php
+
+$host = "localhost";
+$user = "root";
+$pass = "";
+$db   = "student_portal";
+
+$conn = new mysqli($host, $user, $pass, $db);
+
+if ($conn->connect_error) {
+    die("koneksi gagal: " . $conn->connect_error);
+}
+
+// Mulai session jika belum
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+?>
+
+#
+#
+#
+
+KODE functions.php:
+
+<?php
+
+function ambilSemuaMahasiswa($conn) {
+
+    $sql =
+        "SELECT
+            mahasiswa.id,
+            mahasiswa.nim,
+            mahasiswa.nama,
+            mahasiswa.email,
+            program_studi.nama_prodi
+        FROM mahasiswa
+        JOIN program_studi
+            ON mahasiswa.id_prodi =
+                program_studi.id_prodi
+        ORDER BY mahasiswa.nama ASC";
+    
+    return $conn->query($sql);
+}
+
+
+function ambilSemuaProdi($conn) {
+
+    $sql =
+        "SELECT *
+        FROM program_studi
+        ORDER BY nama_prodi ASC";
+    
+    return $conn->query($sql);
+}
+
+
+function tambahMahasiswa(
+    $conn,
+    $nim,
+    $nama,
+    $email,
+    $password,
+    $idProdi
+) {
+
+    $stmt = $conn->prepare(
+        "INSERT INTO mahasiswa (
+            nim,
+            nama,
+            email,
+            password,
+            id_prodi
+        )
+        VALUES (?, ?, ?, ?, ?)"
+    );
+
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param(
+        "ssssi",
+        $nim,
+        $nama,
+        $email,
+        $password,
+        $idProdi
+    );
+
+    return $stmt->execute();
+}
+
+#
+#
+#
+
+KODE index.php:
+
+<?php
+
+require_once "config.php";
+require_once "functions.php";
+
+$result = ambilSemuaMahasiswa($conn);
+
+?>
+
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Data Mahasiswa</title>
+</head>
+
+<body>
+<h1>Data Mahasiswa</h1>
+<p><a href="tambah.php">Tambah Mahasiswa</a></p>
+<hr>
+<?php if ($result->num_rows > 0): ?>
+
+    <table border="1" cellpadding="8">
+
+        <tr>
+            <th>No</th>
+            <th>NIM</th>
+            <th>Nama</th>
+            <th>Email</th>
+            <th>Program Studi</th>
+        </tr>
+
+        <?php $no = 1; ?>
+
+        <?php while (
+            $row = 
+            $result->fetch_assoc()
+        ): ?>
+
+            <tr>
+                <td>
+                    <?= $no ?>
+                </td>
+                <td>
+                    <?= htmlspecialchars($row["nim"]) ?>
+                </td>
+                <td>
+                    <?= htmlspecialchars($row["nama"]) ?>
+                </td>
+                <td>
+                    <?= htmlspecialchars($row["email"]) ?>
+                </td>
+                <td>
+                    <?= htmlspecialchars($row["nama_prodi"]) ?>
+                </td>
+            </tr>
+            <?php $no++; ?>
+        
+        <?php endwhile ?>
+    
+    </table>
+
+<?php else: ?>
+
+    <p>Belum ada data mahasiswa.</p>
+
+<?php endif; ?>
+
+</body>
+</html>
+
+#
+#
+#
+
+KODE tambah.php:
+
+<?php
+
+require_once "config.php";
+require_once "functions.php";
+
+$nim = "";
+$nama = "";
+$email = "";
+$password = "";
+$idProdi = "";
+
+$errors = [];
+
+$resultProdi = ambilSemuaProdi($conn);
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nim = trim($_POST["nim"] ?? "");
+    $nama = trim($_POST["nama"] ?? "");
+    $email = trim($_POST["email"] ?? "");
+    $password = trim($_POST["password"] ?? "");
+    $idProdi = trim($_POST["id_prodi"] ?? "");
+
+    if ($nim === "") {
+        $errors[] = "NIM wajib diisi.";
+    }
+
+    if ($nama === "") {
+        $errors[] = "Nama wajib diisi.";
+    }
+
+    if ($email === "") {
+        $errors[] = "Email wajib diisi.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Format email tidak valid.";
+    }
+
+    if ($password === "") {
+        $errors[] = "Password wajib diisi.";
+    }
+
+    if ($idProdi === "") {
+        $errors[] = "Program studi wajib diisi.";
+    }
+
+    if (count($errors) === 0) {
+        $berhasil = tambahMahasiswa(
+            $conn,
+            $nim,
+            $nama,
+            $email,
+            $password,
+            (int) $idProdi
+        );
+
+        if ($berhasil) {
+            header("Location: index.php");
+            exit;
+        } else {
+            $errors[] = "Data gagal disimpan. NIM atau email mungkin sudah digunakan.";
+        }
+    }
+}
+
+?>
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tambah Mahasiswa</title>
+</head>
+
+<body>
+
+    <h1>Tambah Mahasiswa</h1>
+
+    <p>
+        <a href="index.php">Kembali ke Daftar</a>
+    </p>
+
+    <hr>
+
+    <?php if (count($errors) > 0): ?>
+        <h3>Terjadi Kesalahan</h3>
+        <ul>
+            <?php foreach ($errors as $error): ?>
+                <li><?= htmlspecialchars($error) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+
+    <form method="POST">
+        <p>
+            <label>NIM</label><br>
+            <input type="text" name="nim" value="<?= htmlspecialchars($nim) ?>">
+        </p>
+        
+        <p>
+            <label>Nama</label><br>
+            <input type="text" name="nama" value="<?= htmlspecialchars($nama) ?>">
+        </p>
+
+        <p>
+            <label>Email</label><br>
+            <input type="email" name="email" value="<?= htmlspecialchars($email) ?>">
+        </p>
+
+        <p>
+            <label>Password</label><br>
+            <input type="password" name="password">
+        </p>
+
+        <p>
+            <label>Program Studi</label><br>
+            <select name="id_prodi">
+                <option value="">-- Pilih Program Studi --</option>
+                <?php while ($prodi = $resultProdi->fetch_assoc()): ?>
+                    <option value="<?= $prodi["id_prodi"] ?>" <?= $idProdi == $prodi["id_prodi"] ? "selected" : "" ?>>
+                        <?= htmlspecialchars($prodi["nama_prodi"]) ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+        </p>
+
+        <button type="submit">Simpan</button>
+    </form>
+
+</body>
+
+</html>
+
+#
+#
+#
+
+-- ============================================
+-- PEMROGRAMAN WEB LANJUTAN I
+-- PERTEMUAN 6
+-- BASIS DATA RELASIONAL DAN SQL
+-- ============================================
+
+
+-- ============================================
+-- 1. CREATE DATABASE
+-- DDL
+-- ============================================
+
+CREATE DATABASE student_portal;
+
+USE student_portal;
+
+
+-- ============================================
+-- 2. CREATE TABLE PROGRAM STUDI
+-- DDL
+-- ============================================
+
+CREATE TABLE program_studi (
+    id_prodi INT AUTO_INCREMENT PRIMARY KEY,
+    nama_prodi VARCHAR(100) NOT NULL UNIQUE
+);
+
+
+-- ============================================
+-- 3. CREATE TABLE MAHASISWA
+-- DDL
+-- ============================================
+
+CREATE TABLE mahasiswa (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nim VARCHAR(20) NOT NULL UNIQUE,
+    nama VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    id_prodi INT NOT NULL,
+    nilai_tugas DECIMAL(5,2) DEFAULT 0,
+    nilai_uts DECIMAL(5,2) DEFAULT 0,
+    nilai_uas DECIMAL(5,2) DEFAULT 0,
+    kehadiran INT DEFAULT 0,
+
+    FOREIGN KEY (id_prodi)
+        REFERENCES program_studi(id_prodi)
+);
+
+#
+#
+#
+
+-- ============================================
+-- 4. INSERT PROGRAM STUDI
+-- DML
+-- ============================================
+INSERT INTO program_studi
+    (nama_prodi)
+VALUES
+    ('Sistem Informasi'),
+    ('Informatika'),
+    ('Teknik Elektro');
+
+
+
+-- ============================================
+-- 5. INSERT MAHASISWA
+-- DML
+-- ============================================
+INSERT INTO mahasiswa (
+    nim,
+    nama,
+    email,
+    password,
+    id_prodi,
+    nilai_tugas,
+    nilai_uts,
+    nilai_uas,
+    kehadiran
+)
+VALUES
+(
+    '412026001',
+    'Andi Wijaya',
+    'andi@ukrida.ac.id',
+    '123456',
+    1,
+    80,
+    78,
+    90,
+    85
+),
+(
+    '412026002',
+    'Budi Santoso',
+    'budi@ukrida.ac.id',
+    '123456',
+    1,
+    75,
+    70,
+    82,
+    80
+),
+(
+    '412026003',
+    'Citra Lestari',
+    'citra@ukrida.ac.id',
+    '123456',
+    1,
+    90,
+    88,
+    92,
+    95
+),
+(
+    '412026004',
+    'Dimas Saputra',
+    'dimas@ukrida.ac.id',
+    '123456',
+    2,
+    65,
+    68,
+    70,
+    75
+),
+(
+    '412026005',
+    'Eka Putri',
+    'eka@ukrida.ac.id',
+    '123456',
+    2,
+    88,
+    85,
+    87,
+    90
+);
+
+#
+#
+#
+
+KODE DATABASE student_portal:
+
+-- ============================================
+-- 6. PERHITUNGAN NILAI AKHIR
+-- PENGAYAAN
+-- ============================================
+
+SELECT
+    nim,
+    nama,
+    nilai_tugas,
+    nilai_uts,
+    nilai_uas,
+    (
+        nilai_tugas * 0.30 +
+        nilai_uts * 0.30 +
+        nilai_uas * 0.40
+    ) AS nilai_akhir
+FROM mahasiswa;
+
+#
+#
+#
+
+Halo Deepseek, dari Struktur Kode dan beberapa kode file di atas, 
+aku ingin kamu kembangkan itu menjadi aplikasi sederhana untuk mengelola, menampilkan dan menambahkan data akademik mahasiswa. 
+
+UNTUK DETAILNYA: 
+
+Tolong tambahkan lebih banyak jenis program studi pada database student_portal itu, tambahkan pada tabel: program_studi di kolom: nama_prodi
+Jadi, semua value kolom nama_prodi menjadi: 
+"Teknik Elektro"
+"Teknik Industri"
+"Teknik Sipil"
+"Informatika"
+"Sistem Informasi"
+
+Pada database student_portal itu, tolong tambahkan kolom: kode_prodi pada tabel: program_studi
+kolom kode_prodi akan berisi:
+    "21": "Teknik Elektro"
+    "22": "Teknik Industri"
+    "24": "Teknik Sipil"
+    "41": "Informatika"
+    "42": "Sistem Informasi"
+
+Sebenarnya pada database student_portal, kurasa kamu perlu menambahkan beberapa kolom lainnya agar sistemnya bisa berjalan dengan baik. 
+Jadi, kamu bisa baca perintah untuk mengubah form pada kode tambah.php di bawah ini. 
+
+Lalu pada kode tambah.php, aku ingin kamu mengubah bagian Form nya, yang menambahkan data mahasiswa ke database student_portal itu. 
+Jadi pada bagian Form itu, ada: 
+
+1. Input NIM. Tapi, input NIM ini bukan hasil input ketikan dari user, melainkan hasil input otomatis. 
+Jadi, NIM adalah kombinasi dari: kode_prodi (contoh: 42) dari program studinya + tahun angkatan atau tahun dia masuk (contoh: 2025) + nomor urut (001). 
+aku agak sulit menjelaskannya, tapi yang aku ketahui, input NIM itu otomatis dari kombinasi ketiga itu. 
+
+2. Input Nama. 
+
+3. Input Email. 
+
+4. Input Password. 
+
+5. Input Tahun Angkatan (atau tahun dia masuk) (contohnya: 2025). 
+
+6. Input Program Studi. Jadi pada input Program Studi ini, 
+dia masih menggunakan <select> seperti sebelumnya. 
+
+Untuk pengolahan data mahasiswa: 
+Aku ingin kamu menambahkan fitur login untuk mahasiswa, dengan email dan password mahasiswa yang ada pada database tersebut, 
+Jadi, jangan lupa: 
+• Buat form login berisi Email dan Password menggunakan method POST.
+• Data login harus diperiksa dari tabel mahasiswa.
+• Gunakan prepared statement pada proses pencarian data user.
+• Jika login gagal, tampilkan pesan Email atau password salah.
+• Jika login berhasil, simpan status login dan NIM user ke session.
+• dashboard.php hanya boleh diakses oleh user yang sudah login.
+• Jika belum login, arahkan kembali ke login.php.
+
+Untuk Pengambilan Data Mahasiswa: 
+• Pada dashboard.php, ambil data mahasiswa dari database berdasarkan NIM yang tersimpan pada session.
+• Gunakan prepared statement.
+• Tampilkan NIM, Nama, Email, Nilai Tugas, Nilai UTS, Nilai UAS, dan Kehadiran.
+
+Pembuatan Function Perhitungan Akademik:
+• Buat function hitungNilaiAkhir() dengan bobot: Tugas 30%, UTS 30%, UAS 40%.
+• Buat function tentukanGrade() dengan ketentuan: >=85 A, >=70 B, >=60 C, >=50 D, selain itu E.
+• Tentukan status kelulusan: LULUS jika nilai akhir >=60 dan kehadiran >=75; selain itu TIDAK LULUS.
+• Tampilkan Nilai Akhir, Grade, dan Status Kelulusan pada dashboard.
+
+Bagian Logout:
+• Buat logout.php untuk menghapus/menghancurkan session dan mengarahkan user kembali ke
+login.php.
+
+---
+
+Halo Deepseek, terimakasih untuk kodenya, sejauh ini lancar dan tidak ditemukan masalah. 
+
+Ada satu hal lagi, aku ingin tau gimana sih cara kode NIM itu dibentuk dalam database. 
+Kode NIM itu kan dibentuk dari kombinasi: kode_prodi (contoh: 42) dari program studinya + tahun angkatan atau tahun dia masuk (contoh: 2025) + nomor urut (001). 
+
+aku butuh kejelasan bagaimana kodenya itu bekerja dalam membentuk NIM tersebut. 
+Mungkin untuk kode_prodi dan tahun angkatan itu diambil dari database, tapi untuk nomor urut aku agak bingung. 
+Apakah nomor urut itu dimulai dari siapa mahasiswa yang paling awal masuk suatu prodi di tahun angkatan tersebut? 
+
+Jadi, tolong bantu aku, aku butuh contoh sederhana yang serupa dengan kode yang kamu kembangkan itu, tentang fitur tambah mahasiswa yang berisi form tambah mahasiswa tersebut. Kita pakai database yang sama saja dengan yang database aplikasi kamu kembangkan itu. 
+Pada contoh sederhana itu, terdapat form tambah mahasiswa yang serupa dengan kode yang kamu kembangkan sebelumnya, 
+kode-kode bagaimana data dari form tersebut ditambahkan ke dalam database, bagaimana NIM nya itu dibentuk dan ditambahkan ke dalam database, 
+pokoknya yang berkaitan sama form itu sih, aku ingin tau cara kerja kode itu gimana antara form dengan databasenya dengan menulis dan memahami contoh sederhananya itu, yang login logout dan dashboard itu tidak perlu. 
+Lalu ada tabel data mahasiswa yang ditampilkan, seperti sebelumnya, untuk melihat data dari database itu. 
+
+
+
+Oke, Halo DeepSeek, aku ingin minta tolong kamu lagi, aku mendapat 4 potongan kode yang berkaitan dengan aplikasi Student Portal tentang proses UPDATE dan DELETE data dari database MySQL, yaitu:
+
+1. Tampaknya kode di bawah ini berkaitan dengan proses DELETE, menghapus data mahasiswa: 
+
+<?php
+require_once "config.php";
+require_once "functions.php";
+
+$id = $_GET['id'] ?? "";
+
+if ($id === "" || !is_numeric($id)) {
+    die("ID tidak valid.");
+}
+
+$mahasiswa = ambilMahasiswaById($conn, (int) $id);
+
+if ($mahasiswa === null) {
+    die("Data mahasiswa tidak ditemukan.");
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (hapusMahasiswa($conn, (int) $id)) {
+        header("Location: index.php?status=deleted");
+        exit;
+    } else {
+        echo "Data gagal dihapus.";
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Hapus Mahasiswa</title>
+</head>
+<body>
+    <h1>Hapus Mahasiswa</h1>
+    <p>Apakah Anda yakin ingin menghapus data mahasiswa berikut?</p>
+    <ul>
+        <li><strong>NIM:</strong> <?= htmlspecialchars($mahasiswa['nim']) ?></li>
+        <li><strong>Nama:</strong> <?= htmlspecialchars($mahasiswa['nama']) ?></li>
+        <li><strong>Email:</strong> <?= htmlspecialchars($mahasiswa['email']) ?></li>
+        <li><strong>Program Studi:</strong> <?= htmlspecialchars($mahasiswa['id_prodi']) ?></li>
+    </ul>
+
+    <form method="POST">
+        <button type="submit">Ya, Hapus</button>
+    </form>
+    <br>
+</body><a href="index.php">Batal</a>
+</html>
+
+#
+#
+#
+
+2. Tampaknya kode di bawah ini berisi function-function untuk menjalankan fungsi UPDATE dan DELETE data itu, 
+Untuk menjalankan fungsi UPDATE dan DELETE data, mungkin datanya harus diambil dan di-READ juga, jadi tampaknya di sini juga terdapat function untuk READ data:
+
+<?php
+function ambilSemuaProdi($conn) {
+    $stmt = $conn->query(
+        "SELECT * FROM program_studi"
+    );
+    
+    $execute = $stmt->execute();
+    $result = $execute->get_result();
+    $prodi = $result->fetch_assoc();
+
+    return $prodi;
+}
+
+function ambilMahasiswaById($conn,$id) {
+    $stmt = $conn->prepare(
+        "SELECT
+                mahasiswa.*,
+                program_studi.nama_prodi
+            FROM mahasiswa
+            JOIN program_studi
+                ON mahasiswa.id_prodi =
+                    program_studi.id_prodi
+            WHERE mahasiswa.id = ?"
+    );
+    $stmt->bind_param(
+        "i",
+        $id
+    );
+    $stmt->execute();
+
+    $result =
+        $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+function updateMahasiswa(
+    $conn,
+    $id,
+    $nim,
+    $nama,
+    $email,
+    $idProdi
+) {
+    $stmt = $conn->prepare(
+        "UPDATE mahasiswa
+            SET
+                nim = ?,
+                nama = ?,
+                email = ?,
+                id_prodi = ?
+            WHERE id = ?"
+    );
+    $stmt->bind_param(
+        "sssii",
+        $nim,
+        $nama,
+        $email,
+        $idProdi,
+        $id
+    );
+    return $stmt->execute();
+}
+
+function hapusMahasiswa($conn, $id) {
+    $stmt = $conn->prepare(
+        "DELETE
+            FROM mahasiswa
+            WHERE id = ?"
+    );
+    $stmt->bind_param(
+        "i",
+        $id
+    );
+    return $stmt->execute();
+}
+
+#
+#
+#
+
+3. Kode di bawah ini adalah potongan dari suatu index.php, 
+tampaknya ini seperti sebuah tombol aksi yang dimasukkan pada setiap baris data tabel mahasiswa untuk menjalankan fungsi edit dan hapus data mahasiswa pada baris data tersebut:
+
+<td>
+
+    <a
+        href="edit.php?id=<?= $row["id"] ?>">
+        Edit
+    </a>
+
+    |
+
+    <a
+        href="hapus.php?id=<?= $row["id"] ?>">
+        Hapus
+    </a>
+
+</td>
+
+#
+#
+#
+
+4. Tampaknya kode di bawah ini berkaitan dengan proses UPDATE, meng-update atau mengedit data mahasiswa: 
+
+<?php
+
+require_once "config.php";
+require_once "functions.php";
+
+$id = $_GET["id"] ?? "";
+
+if ($id === "" || !is_numeric($id)) {
+    die("ID tidak valid.");
+}
+
+$mahasiswa = ambilMahasiswaById($conn, (int) $id);
+
+if ($mahasiswa === null) {
+    die("Data mahasiswa tidak ditemukan.");
+}
+
+$errors = [];
+
+$nim = $mahasiswa["nim"];
+$nama = $mahasiswa["nama"];
+$email = $mahasiswa["email"];
+$idProdi = $mahasiswa["id_prodi"];
+
+$resultProdi = ambilSemuaProdi($conn);
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nim = trim($_POST["nim"] ?? "");
+    $nama = trim($_POST["nama"] ?? "");
+    $email = trim($_POST["email"] ?? "");
+    $idProdi = $_POST["id_prodi"] ?? "";
+
+    if ($nim === "") {
+        $errors[] = "NIM wajib diisi.";
+    }
+    if ($nama === "") {
+        $errors[] = "Nama wajib diisi.";
+    }
+    if ($email === "") {
+        $errors[] = "Email wajib diisi.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Format email tidak valid.";
+    }
+    if ($idProdi === "") {
+        $errors[] = "Program studi wajib dipilih.";
+    }
+    if (count($errors) === 0) {
+        $berhasil = updateMahasiswa(
+            $conn,
+            (int) $id,
+            $nim,
+            $nama,
+            $email,
+            (int) $idProdi,
+        );
+
+        if ($berhasil) {
+            header("Location: index.php?status=updated");
+            exit;
+        } else {
+            $errors[] = "Data gagal diperbarui.";
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Mahasiswa</title>
+</head>
+<body>
+    <h1>Edit Mahasiswa</h1>
+    <p><a href="index.php">Kembali ke Daftar</a></p>
+    <hr>
+    <?php if (count($errors) > 0): ?>
+        <h3>Terjadi Kesalahan</h3>
+        <ul>
+            <?php foreach ($errors as $error): ?>
+                <li><?= htmlspecialchars($error) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+
+    <form method="POST">
+        <p>
+            <label>NIM</label><br>
+            <input type="text" name="nim" value="<?= htmlspecialchars($nim) ?>">
+        </p>
+        <p>
+            <label>Nama</label><br>
+            <input type="text" name="nama" value="<?= htmlspecialchars($nama) ?>">
+        </p>
+        <p>
+            <label>Email</label><br>
+            <input type="email" name="email" value="<?= htmlspecialchars($email) ?>">
+        </p>
+        <p>
+            <label>Program Studi</label><br>
+            <select name="id_prodi">
+                <option value="">-- Pilih Program Studi --</option>
+                <?php while ($prodi = $resultProdi->fetch_assoc()): ?>
+                    <option value="<?= $prodi["id_prodi"] ?>"
+                    <?= $idProdi == $prodi["id_prodi"] ? "selected" : "" ?>>
+                    <?= htmlspecialchars($prodi["nama_prodi"]) ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+        </p>
+        <button type="submit">Simpan Perubahan</button>
+    </form>
+</body>
+</html>
+
+#
+#
+#
+
+Jadi aku ingin kamu: Menggabungkan keempat potongan kode yang aku kirimkan itu menjadi fitur tambahan untuk mengedit (UPDATE) dan menghapus (DELETE) data pada aplikasi Student Portal yang sudah kamu kembangkan sebelumnya itu yang berdasarkan prompt.txt yang kukirimkan sebelumnya itu (bukan yang versi contoh sederhana), 
+Sesuaikan keempat potongan kode itu pada aplikasi Student Portal nya agar fitur UPDATE dan DELETE dapat berjalan dengan baik pada aplikasi Student Portal itu. 
+Jadi sepertinya perlu ada pengubahan pada keempat potongan kode itu lagi, terutama pada bagian NIM, jadi begini detailnya: 
+
+Sebelumnya, pada aplikasi Student Portal, NIM itu tidak diinput manual, tetapi di generate otomatis berdasarkan kode prodi dan tahun masuk dan nomor urut. 
+Proses UPDATE dan DELETE data mahasiswa ini pasti berkaitan dengan NIM, jadi sesuai dengan NIM yang digenerate otomatis berdasarkan kode prodi dan tahun masuk dan nomor urut itu, 
+Jika kode prodi atau tahun masuk atau mungkin id prodinya berubah, maka NIM seharusnya dapat ikut berubah juga secara otomatis, aku kurang bisa menjelaskannya, 
+tapi intinya adalah jika unsur-unsur pembentuk NIM itu ada yang berubah, seharusnya NIM itupun juga ikut berubah (NIM ter-UPDATE otomatis) mengikuti perubahan terbaru dari unsur-unsur pembentuk NIM tersebut. 
+
+Untuk Database MySQL nya, aku masih memakai Database yang sama dengan database aplikasi Student Portal itu (setelah migration), databasenya juga sudah aku Renumber bersih sesuai kode SQL yang kamu berikan terakhir itu agar Andi-Budi-Citra (Sistem Informasi 2026) akan jadi 422026001/002/003, Dimas-Eka (Informatika 2026) akan jadi 412026001/002 — konsisten dengan logika. 
